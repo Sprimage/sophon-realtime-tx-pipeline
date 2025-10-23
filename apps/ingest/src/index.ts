@@ -5,7 +5,7 @@ import { BlockFetcher } from './blockFetcher';
 import { WSClient } from './wsClient';
 import { registry } from './metrics';
 import pino from 'pino';
-import { queue } from './queue';
+import { getStats } from './queue';
 
 const log = pino({ name: 'ingest' });
 
@@ -14,19 +14,16 @@ async function main() {
   const ws = new WSClient(CFG.wss, fetcher, CFG.backoffMs);
   ws.start().catch(err => log.error({ err }, 'ws failed'));
 
-  let seenPending = 0;
-  let seenIncluded = 0;
-  queue.on(async (batch) => {
-    for (const e of batch) {
-      if (e.status === 'pending') seenPending++;
-      if (e.status === 'included') seenIncluded++;
-    }
-    // print every 50 events to avoid spam
+  // periodic info log of delivery stats (from redis publisher)
+  let lastLoggedTotal = 0;
+  setInterval(() => {
+    const { seenPending, seenIncluded } = getStats();
     const total = seenPending + seenIncluded;
-    if (total % 50 === 0) {
+    if (total - lastLoggedTotal >= 50) {
       log.info({ seenPending, seenIncluded, total }, 'ingest delivered');
+      lastLoggedTotal = total;
     }
-  });
+  }, 2000);
 
   const server = createServer(async (req, res) => {
     if (req.url?.startsWith('/metrics')) {
@@ -35,6 +32,7 @@ async function main() {
     }
     if (req.url?.startsWith('/healthz')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
+      const { seenPending, seenIncluded } = getStats();
       res.end(JSON.stringify({ status: 'ok',  seenPending, seenIncluded })); return;
     }
     res.writeHead(404); res.end();

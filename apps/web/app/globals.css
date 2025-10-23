@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 248 248 250;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: rgb(248, 250, 252);
+  color: #0f172a; /* slate-900 */
+}
+
+.card {
+  @apply bg-white rounded-xl shadow-card border border-gray-100;
+}
+
+.muted {
+  @apply text-gray-500;
+}
+
+

@@ -2,7 +2,7 @@ import { WebSocketProvider } from 'ethers';
 import pino from 'pino';
 import WebSocket from 'ws';
 import { BlockFetcher } from './blockFetcher';
-import { queue } from './queue';
+import { publish } from './queue';
 import { wsConnected, wsPendingConnected, pendingSeenTotal } from './metrics';
 
 export class WSClient {
@@ -35,7 +35,7 @@ export class WSClient {
           try {
             const seenAtMs = Date.now();
             const batch = await this.fetcher.fetchBlockByNumberAndMap(blockNumber, seenAtMs);
-            await queue.publish(batch);
+            await publish(batch);
            
           } catch (err) {
             this.log.error({ err }, 'error processing block');
@@ -80,7 +80,7 @@ export class WSClient {
             if (msg.method === 'eth_subscription' && msg.params?.result) {
               const hash = msg.params.result as string;
               pendingSeenTotal.inc(1);
-              queue.publish([{ status: 'pending', hash, firstSeenMs: Date.now() }]);
+              publish([{ status: 'pending', hash, firstSeenMs: Date.now() }]);
             }
             if (msg.id === 1 && msg.error) {
               this.log.warn({ err: msg.error }, 'pending subscription not allowed');

@@ -11,17 +11,25 @@ export class BlockFetcher {
     const block = await this.http.getBlock(num, true) as Block & { transactions: any[] };
     const includedAtMs = Date.now();
 
-    const batch: IngestedTx[] = block.transactions.map((tx: any) => ({
-      status: 'included',
-      hash: tx.hash,
-      firstSeenMs: seenAtMs,
-      includedBlock: Number(block.number),
-      includedAtMs,
-      from: tx.from,
-      to: tx.to ?? null,
-      valueWei: tx.value?.toString?.() ?? String(tx.value ?? '0'),
-      feeWei: tx.maxFeePerGas ? String(tx.maxFeePerGas) : null,
-    }));
+    const batch: IngestedTx[] = block.transactions.map((tx: any) => {
+      const isHashOnly = typeof tx === 'string';
+      const hash = isHashOnly ? tx : tx.hash;
+      const from = isHashOnly ? null : (tx.from ?? null);
+      const to = isHashOnly ? null : (tx.to ?? null);
+      const valueWei = isHashOnly ? '0' : (tx.value?.toString?.() ?? String(tx.value ?? '0'));
+      const feeWei = isHashOnly ? null : (tx.maxFeePerGas ? String(tx.maxFeePerGas) : null);
+      return {
+        status: 'included',
+        hash,
+        firstSeenMs: seenAtMs,
+        includedBlock: Number(block.number),
+        includedAtMs,
+        from,
+        to,
+        valueWei,
+        feeWei,
+      } as IngestedTx;
+    });
     includedSeenTotal.inc(batch.length);
     ingestToQueueMs.observe(includedAtMs - seenAtMs);
     return batch;

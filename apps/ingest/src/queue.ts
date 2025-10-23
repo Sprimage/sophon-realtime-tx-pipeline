@@ -1,12 +1,25 @@
+import Redis from 'ioredis';
 import { IngestedTx } from './types';
+import { CFG } from './config';
 
-type Listener = (batch: IngestedTx[]) => Promise<void> | void;
+const redis = new Redis(CFG.redisUrl);
+const STREAM = CFG.stream;
 
-class InprocQueue {
-  private listeners: Listener[] = [];
-  on(fn: Listener) { this.listeners.push(fn); }
-  async publish(batch: IngestedTx[]) {
-    await Promise.all(this.listeners.map(l => l(batch)));
+let seenPending = 0;
+let seenIncluded = 0;
+
+export async function publish(batch: IngestedTx[]): Promise<void> {
+  for (const e of batch) {
+    if (e.status === 'pending') seenPending++;
+    if (e.status === 'included') seenIncluded++;
   }
+  const pipeline = redis.pipeline();
+  for (const e of batch) {
+    pipeline.xadd(STREAM, '*', 'data', JSON.stringify(e));
+  }
+  await pipeline.exec();
 }
-export const queue = new InprocQueue();
+
+export function getStats() {
+  return { seenPending, seenIncluded };
+}
