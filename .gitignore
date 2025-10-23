@@ -1,6 +1,5 @@
 .env
 node_modules
-*.md
 !README.md
 sophon-demo.sqlite
 .next
